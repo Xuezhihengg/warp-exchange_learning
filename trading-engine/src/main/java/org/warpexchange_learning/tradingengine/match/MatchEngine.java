@@ -2,6 +2,7 @@ package org.warpexchange_learning.tradingengine.match;
 
 
 import org.springframework.stereotype.Component;
+import org.warpexchange_learning.common.bean.OrderBookBean;
 import org.warpexchange_learning.common.enums.Direction;
 import org.warpexchange_learning.common.enums.OrderStatus;
 import org.warpexchange_learning.common.model.trade.OrderEntity;
@@ -13,8 +14,8 @@ public class MatchEngine {
 
     public final OrderBook buyBook = new OrderBook(Direction.BUY);
     public final OrderBook sellBook = new OrderBook(Direction.SELL);
-    public BigDecimal marketPrice = BigDecimal.ZERO; // 最新市场价
-    private long sequenceId; // 上次处理的Sequence ID
+    public BigDecimal marketPrice = BigDecimal.ZERO; // 最新成交价
+    private long sequenceId; // 消息事件ID是MatchEngine的状态之一，是当前处理订单的sequenceId
 
     public MatchResult processOrder(long sequenceId, OrderEntity order) {
         return switch (order.direction) {
@@ -82,4 +83,17 @@ public class MatchEngine {
         return matchResult;
     }
 
+    public OrderBookBean getOrderBook(int maxDepth){
+        return new OrderBookBean(this.sequenceId, this.marketPrice, this.buyBook.getOrderBook(maxDepth), this.sellBook.getOrderBook(maxDepth));
+    }
+
+    public void debug() {
+        System.out.println("---------- match engine ----------");
+        System.out.println(this.sellBook);
+        System.out.println("  ----------");
+        System.out.println("  " + this.marketPrice);
+        System.out.println("  ----------");
+        System.out.println(this.buyBook);
+        System.out.println("---------- // match engine ----------");
+    }
 }

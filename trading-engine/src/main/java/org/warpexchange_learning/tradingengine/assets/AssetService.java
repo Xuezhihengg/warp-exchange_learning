@@ -1,12 +1,18 @@
 package org.warpexchange_learning.tradingengine.assets;
 
+import org.springframework.stereotype.Component;
 import org.warpexchange_learning.common.enums.AssetEnum;
 import org.warpexchange_learning.common.support.LoggerSupport;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+@Component
 public class AssetService extends LoggerSupport {
 
     final ConcurrentMap<Long, ConcurrentMap<AssetEnum, Asset>> userAssets = new ConcurrentHashMap<>();
@@ -90,5 +96,21 @@ public class AssetService extends LoggerSupport {
         Asset zeroAsset = new Asset();
         map.put(assetId, zeroAsset);
         return zeroAsset;
+    }
+
+    public void debug() {
+        System.out.println("---------- assets ----------");
+        List<Long> userIds = new ArrayList<>(userAssets.keySet());
+        Collections.sort(userIds);
+        for (Long userId : userIds) {
+            System.out.println("  user " + userId + " ----------");
+            Map<AssetEnum, Asset> assets = userAssets.get(userId);
+            List<AssetEnum> assetIds = new ArrayList<>(assets.keySet());
+            Collections.sort(assetIds);
+            for (AssetEnum assetId : assetIds) {
+                System.out.println("    " + assetId + ": " + assets.get(assetId));
+            }
+        }
+        System.out.println("---------- // assets ----------");
     }
 }

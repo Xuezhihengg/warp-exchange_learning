@@ -1,15 +1,20 @@
 package org.warpexchange_learning.tradingengine.order;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 import org.warpexchange_learning.common.enums.AssetEnum;
 import org.warpexchange_learning.common.enums.Direction;
 import org.warpexchange_learning.common.model.trade.OrderEntity;
 import org.warpexchange_learning.tradingengine.assets.AssetService;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+@Component
 public class OrderService {
 
     final AssetService assetService;
@@ -91,6 +96,17 @@ public class OrderService {
         return this.activeOrders.get(orderId);
     }
 
+    public void debug() {
+        System.out.println("---------- orders ----------");
+        List<OrderEntity> orders = new ArrayList<>(this.activeOrders.values());
+        Collections.sort(orders);
+        for (OrderEntity order : orders) {
+            System.out.println("  " + order.id + " " + order.direction + " price: " + order.price + " unfilled: "
+                    + order.unfilledQuantity + " quantity: " + order.quantity + " sequenceId: " + order.sequenceId
+                    + " userId: " + order.userId);
+        }
+        System.out.println("---------- // orders ----------");
+    }
 
 
 
