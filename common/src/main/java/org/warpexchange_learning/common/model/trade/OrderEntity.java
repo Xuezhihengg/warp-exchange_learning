@@ -73,6 +73,7 @@ public class OrderEntity implements EntitySupport, Comparable<OrderEntity> {
     @Column(nullable = false, updatable = false)
     public long updatedAt;
 
+    // 通过版本号机制实现乐观锁
     private int version;
 
     @Transient
@@ -100,10 +101,10 @@ public class OrderEntity implements EntitySupport, Comparable<OrderEntity> {
         entity.status = this.status;
         entity.unfilledQuantity = this.unfilledQuantity;
         entity.updatedAt = this.updatedAt;
+        // 版本号不对，说明在读的过程中有其他线程对该数据进行了修改，返回null用于读取重试
         if (ver != this.version) {
             return null;
         }
-
         entity.createdAt = this.createdAt;
         entity.direction = this.direction;
         entity.id = this.id;

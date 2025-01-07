@@ -34,8 +34,7 @@ public class RedisService {
     final GenericObjectPool<StatefulRedisConnection<String, String>> redisConnectionPool;
 
     public RedisService(@Autowired RedisConfiguration redisConfig) {
-        RedisURI uri = RedisURI.Builder.redis(redisConfig.getHost(), redisConfig.getPort())
-                .withPassword(redisConfig.getPassword().toCharArray()).withDatabase(redisConfig.getDatabase()).build();
+        RedisURI uri = RedisURI.Builder.redis(redisConfig.getHost(), redisConfig.getPort()).withPassword(redisConfig.getPassword().toCharArray()).withDatabase(redisConfig.getDatabase()).build();
         this.redisClient = RedisClient.create(uri);
 
         GenericObjectPoolConfig<StatefulRedisConnection<String, String>> poolConfig = new GenericObjectPoolConfig<>();
@@ -43,8 +42,7 @@ public class RedisService {
         poolConfig.setMaxIdle(5);
         poolConfig.setTestOnReturn(true);
         poolConfig.setTestWhileIdle(true);
-        this.redisConnectionPool = ConnectionPoolSupport.createGenericObjectPool(() -> redisClient.connect(),
-                poolConfig);
+        this.redisConnectionPool = ConnectionPoolSupport.createGenericObjectPool(() -> redisClient.connect(), poolConfig);
     }
 
     @PreDestroy
@@ -85,6 +83,10 @@ public class RedisService {
         });
     }
 
+    /**
+     * 实现 Redis 的 订阅/发布（Pub/Sub）机制，用于订阅一个特定的 Redis 频道，
+     * 并在接收到该频道的消息时，执行一个回调函数（listener）
+     */
     public void subscribe(String channel, Consumer<String> listener) {
         StatefulRedisPubSubConnection<String, String> conn = this.redisClient.connectPubSub();
         conn.addListener(new RedisPubSubAdapter<String, String>() {
@@ -132,6 +134,10 @@ public class RedisService {
         });
     }
 
+    /**
+     * 这里通过callback的方法将redis连接和同步RedisCommands初始化封装起来，
+     * 具体的redis操作通过callback回调函数来实现
+     */
     public <T> T executeSync(SyncCommandCallback<T> callback) {
         try (StatefulRedisConnection<String, String> connection = redisConnectionPool.borrowObject()) {
             connection.setAutoFlushCommands(true);

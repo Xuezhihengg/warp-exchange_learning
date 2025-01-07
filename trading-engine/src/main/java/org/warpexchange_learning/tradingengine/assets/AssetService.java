@@ -25,6 +25,14 @@ public class AssetService extends LoggerSupport {
         return assets.get(assetId);
     }
 
+    public Map<AssetEnum, Asset> getAssets(Long userId) {
+        ConcurrentMap<AssetEnum, Asset> assets = userAssets.get(userId);
+        if (assets == null) {
+            return Map.of();
+        }
+        return assets;
+    }
+
     public boolean tryFreeze(Long userId, AssetEnum assetId, BigDecimal amount) {
         return tryTransfer(Transfer.AVAILABLE_TO_FROZEN, userId, userId, assetId, amount, true);
     }

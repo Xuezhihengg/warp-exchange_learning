@@ -1,5 +1,6 @@
 package org.warpexchange_learning.tradingengine;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -11,10 +12,12 @@ import org.warpexchange_learning.common.message.event.OrderRequestEvent;
 import org.warpexchange_learning.common.message.event.TransferEvent;
 import org.warpexchange_learning.common.messaging.MessageConsumer;
 import org.warpexchange_learning.common.messaging.MessageProducer;
+import org.warpexchange_learning.common.messaging.Messaging;
 import org.warpexchange_learning.common.messaging.MessagingFactory;
 import org.warpexchange_learning.common.model.trade.OrderEntity;
 import org.warpexchange_learning.common.redis.RedisService;
 import org.warpexchange_learning.common.support.LoggerSupport;
+import org.warpexchange_learning.common.util.IpUtil;
 import org.warpexchange_learning.tradingengine.assets.AssetService;
 import org.warpexchange_learning.tradingengine.assets.Transfer;
 import org.warpexchange_learning.tradingengine.clearing.ClearingService;
@@ -63,7 +66,7 @@ public class TradingEngineService extends LoggerSupport {
     @Autowired
     RedisService redisService;
 
-    private MessageConsumer messageConsumer;
+    private MessageConsumer consumer;
 
     private MessageProducer<TickMessage> producer;
 
@@ -80,6 +83,13 @@ public class TradingEngineService extends LoggerSupport {
     private Thread dbThread;
 
     private OrderBookBean latestOrderBook = null;
+
+    @PostConstruct
+    public void init() {
+        // 接收发给TRADE的消息,并使用processMessages处理消息
+        this.consumer = this.messagingFactory.createBatchMessageListener(Messaging.Topic.TRADE, IpUtil.getHostId(), this::processMessages);
+        this.producer = this.messagingFactory.createMessageProducer(Messaging.Topic.TICK, TickMessage.class);
+    }
 
     public void processMessages(List<AbstractEvent> messages){
         this.orderBookChanged = false;

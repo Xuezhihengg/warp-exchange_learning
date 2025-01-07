@@ -104,6 +104,7 @@ public class MessagingFactory extends LoggerSupport {
             @Override
             @SuppressWarnings("unchecked")
             public void onMessage(List<ConsumerRecord<String, String>> data) {
+                // 将data中的数据使用messageTypes反序列化为messages，然后调用messageHandler中的processMessages方法对消息进行处理
                 List<T> messages = new ArrayList<>(data.size());
                 for (ConsumerRecord<String, String> record : data) {
                     AbstractMessage message = messageTypes.deserialize(record.value());
@@ -120,6 +121,11 @@ public class MessagingFactory extends LoggerSupport {
     }
 
 
+    /**
+     * KafkaListenerEndpoint的一个默认实现，可以继承该类或者直接使用它，避免每次都必须实现接口的所有方法
+     * 通过继承或扩展这个适配器类，开发者可以自定义特定的行为。例如，如果你只关心某个特定的配置项（如 getGroupId()、getTopics() 等），
+     * 那么只需要重写这些方法，而不需要重新实现整个接口。
+     */
     static class KafkaListenerEndpointAdapter implements KafkaListenerEndpoint {
 
         @Override
