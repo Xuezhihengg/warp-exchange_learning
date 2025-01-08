@@ -1,6 +1,5 @@
 package org.warpexchange_learning.tradingapi.web.api;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,10 +9,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.async.DeferredResult;
 import org.warpexchange_learning.common.ApiError;
 import org.warpexchange_learning.common.ApiErrorResponse;
+import org.warpexchange_learning.common.ApiException;
 import org.warpexchange_learning.common.bean.OrderBookBean;
 import org.warpexchange_learning.common.bean.OrderRequestBean;
 import org.warpexchange_learning.common.ctx.UserContext;
 import org.warpexchange_learning.common.message.ApiResultMessage;
+import org.warpexchange_learning.common.message.event.OrderCancelEvent;
 import org.warpexchange_learning.common.message.event.OrderRequestEvent;
 import org.warpexchange_learning.common.redis.RedisCache;
 import org.warpexchange_learning.common.redis.RedisService;
@@ -24,8 +25,9 @@ import org.warpexchange_learning.tradingapi.service.SendEventService;
 import org.warpexchange_learning.tradingapi.service.TradingEngineApiProxyService;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 
 
@@ -33,6 +35,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequestMapping("/api")
 public class TradingApiController extends AbstractApiController {
 
+    /**
+     * redisService在TradingApiController中的作用主要是redis读
+     */
     @Autowired
     private RedisService redisService;
 
@@ -63,6 +68,7 @@ public class TradingApiController extends AbstractApiController {
 
     @PostConstruct
     public void init() {
+        // 订阅TRADING_API_RESULT频道，即redisService会建立一个专门监听redis Pub的连接，对于来自TRADING_API_RESULT的消息调用onApiResultMessage进行处理
         this.redisService.subscribe(RedisCache.Topic.TRADING_API_RESULT, this::onApiResultMessage);
     }
 
@@ -92,6 +98,65 @@ public class TradingApiController extends AbstractApiController {
         return data == null ? OrderBookBean.EMPTY : data;
     }
 
+    @ResponseBody
+    @GetMapping(value = "/ticks", produces = "application/json")
+    public String getRecentTicks() {
+        List<String> data = redisService.lrange(RedisCache.Key.RECENT_TICKS, 0, -1);
+        if (data == null || data.isEmpty()) {
+            return "[]";
+        }
+        StringJoiner sj = new StringJoiner(",", "[", "]");
+        for (String t : data) {
+            sj.add(t);
+        }
+        return sj.toString();
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/bars/day", produces = "application/json")
+    public String getDayBars() {
+        long end = System.currentTimeMillis();
+        long start = end - 366 * 86400_000;
+        return getBars(RedisCache.Key.HOUR_BARS, start, end);
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/bars/hour", produces = "application/json")
+    public String getHourBars() {
+        long end = System.currentTimeMillis();
+        long start = end - 720 * 3600_000;
+        return getBars(RedisCache.Key.HOUR_BARS, start, end);
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/bars/min", produces = "application/json")
+    public String getMinBars() {
+        long end = System.currentTimeMillis();
+        long start = end - 1440 * 60_000;
+        return getBars(RedisCache.Key.MIN_BARS, start, end);
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/bars/sec", produces = "application/json")
+    public String getSecBars() {
+        long end = System.currentTimeMillis();
+        long start = end - 3600 * 1_000;
+        return getBars(RedisCache.Key.SEC_BARS, start, end);
+    }
+
+    private String getBars(String key, long start, long end) {
+        List<String> data = redisService.zrangebyscore(key, start, end);
+        if (data == null || data.isEmpty()) {
+            return "[]";
+        }
+        StringJoiner sj = new StringJoiner(",", "[", "]");
+        for (String t : data) {
+            sj.add(t);
+        }
+        return sj.toString();
+    }
+
+
 
     /*
      * 关于DeferredResult：
@@ -105,6 +170,35 @@ public class TradingApiController extends AbstractApiController {
      *          3.2 超时，返回一个你设定的结果
      *      4 浏览得到响应，再次重复1，处理此次响应结果
      */
+
+    @PostMapping(value = "/orders/{orderId}/cancel", produces = "application/json")
+    @ResponseBody
+    public DeferredResult<ResponseEntity<String>> cancelOrder(@PathVariable("orderId") Long orderId) throws Exception {
+        final Long userId = UserContext.getRequiredUserId();
+        String orderStr = tradingEngineApiProxyService.get("/internal/" + userId + "/orders/" + orderId);
+        if (orderStr.equals("null")) {
+            throw new ApiException(ApiError.ORDER_NOT_FOUND, orderId.toString(), "Active order not found.");
+        }
+        final String refId = IdUtil.generateUniqueId();
+        var message = new OrderCancelEvent();
+        message.refId = refId;
+        message.refOrderId = orderId;
+        message.userId = userId;
+        message.createdAt = System.currentTimeMillis();
+        ResponseEntity<String> timeout = new ResponseEntity<>(getTimeoutJson(), HttpStatus.BAD_REQUEST);
+        DeferredResult<ResponseEntity<String>> deferred = new DeferredResult<>(this.asyncTimeout, timeout);
+        deferred.onTimeout(() -> {
+            logger.warn("deferred order {} cancel request refId={} timeout.", orderId, refId);
+            this.deferredResultMap.remove(refId);
+        });
+        // track deferred:
+        this.deferredResultMap.put(refId, deferred);
+        logger.info("cancel order message created: {}", message);
+        this.sendEventService.sendMessage(message);
+        return deferred;
+    }
+
+
 
     /**
      由于createOrder仅仅通过消息系统给定序系统发了一条消息，消息系统本身并不是类似HTTP的请求-响应模式，无法直接拿到消息处理的结果
@@ -135,6 +229,7 @@ public class TradingApiController extends AbstractApiController {
         });
         // track deferred:
         this.deferredResultMap.put(event.refId, deferred);
+        // sendEventService会将OrderRequestEvent发给定序逻辑定序
         this.sendEventService.sendMessage(event);
         return deferred;
     }

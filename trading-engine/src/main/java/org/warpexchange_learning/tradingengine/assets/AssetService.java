@@ -25,6 +25,10 @@ public class AssetService extends LoggerSupport {
         return assets.get(assetId);
     }
 
+    public ConcurrentMap<Long, ConcurrentMap<AssetEnum, Asset>> getUserAssets() {
+        return this.userAssets;
+    }
+
     public Map<AssetEnum, Asset> getAssets(Long userId) {
         ConcurrentMap<AssetEnum, Asset> assets = userAssets.get(userId);
         if (assets == null) {

@@ -21,7 +21,7 @@ public class TradingEngineApiProxyService extends LoggerSupport {
     @Value("#{exchangeConfiguration.apiEndpoints.tradingEngineApi}")
     private String tradingEngineInternalApiEndpoint;
 
-    private OkHttpClient okHttpClient = new OkHttpClient().Builder()
+    private OkHttpClient okHttpClient = new OkHttpClient.Builder()
             // set connect timeout:
             .connectTimeout(1,TimeUnit.SECONDS)
             // set read timeout:

@@ -40,7 +40,7 @@ public class SequenceService extends LoggerSupport implements CommonErrorHandler
     public void init() {
         Thread thread = new Thread(() -> {
             logger.info("start sequence job...");
-            // 向交易引擎发送消息的生产者
+            // 向交易引擎发送定好序的请求
             this.messageProducer = this.messagingFactory.createMessageProducer(Messaging.Topic.TRADE, AbstractEvent.class);
             // find max event id:
             this.sequence = new AtomicLong(this.sequenceHandler.getMaxSequenceId());
@@ -48,7 +48,7 @@ public class SequenceService extends LoggerSupport implements CommonErrorHandler
             // init consumer:
             logger.info("create message consumer for {}...", getClass().getName());
             // share same group id:
-            // 接受来发给定序逻辑的消息，并使用processMessages进行处理
+            // 接受来自API模块的消息，即创建订单请求
             MessageConsumer consumer = this.messagingFactory.createBatchMessageListener(Messaging.Topic.SEQUENCE, GROUP_ID, this::processMessages, this);
             // start running:
             this.running = true;

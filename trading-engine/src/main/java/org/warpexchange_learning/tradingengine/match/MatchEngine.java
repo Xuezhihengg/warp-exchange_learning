@@ -83,6 +83,18 @@ public class MatchEngine {
         return matchResult;
     }
 
+    /**
+     * 从相应的买盘或者卖盘中将订单删除
+     */
+    public void cancel(long ts, OrderEntity order) {
+        OrderBook book = order.direction == Direction.BUY ? this.buyBook : this.sellBook;
+        if (!book.remove(order)) {
+            throw new IllegalArgumentException("Order not found in order book.");
+        }
+        OrderStatus status = order.unfilledQuantity.compareTo(order.quantity) == 0 ? OrderStatus.FULLY_CANCELLED : OrderStatus.PARTIAL_CANCELLED;
+        order.updateOrder(order.unfilledQuantity, status, ts);
+    }
+
     public OrderBookBean getOrderBook(int maxDepth){
         return new OrderBookBean(this.sequenceId, this.marketPrice, this.buyBook.getOrderBook(maxDepth), this.sellBook.getOrderBook(maxDepth));
     }

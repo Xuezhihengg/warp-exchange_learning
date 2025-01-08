@@ -88,7 +88,9 @@ public class RedisService {
      * 并在接收到该频道的消息时，执行一个回调函数（listener）
      */
     public void subscribe(String channel, Consumer<String> listener) {
+        // 为redisClient建立一个订阅连接conn，这个连接将接受来自所订阅频道的消息
         StatefulRedisPubSubConnection<String, String> conn = this.redisClient.connectPubSub();
+        // 向连接中添加一个事件监听器，重写了 message 方法，当收到 Redis 发布的消息时，该方法将被调用
         conn.addListener(new RedisPubSubAdapter<String, String>() {
             @Override
             public void message(String channel, String message) {
@@ -135,7 +137,7 @@ public class RedisService {
     }
 
     /**
-     * 这里通过callback的方法将redis连接和同步RedisCommands初始化封装起来，
+     * 这里通过callback的方法将 从redis连接池中借用一个连接 和 同步RedisCommands初始化 封装起来，
      * 具体的redis操作通过callback回调函数来实现
      */
     public <T> T executeSync(SyncCommandCallback<T> callback) {
