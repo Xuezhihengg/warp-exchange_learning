@@ -109,6 +109,7 @@ public class SequenceService extends LoggerSupport implements CommonErrorHandler
         if (logger.isInfoEnabled()) {
             logger.info("do sequence for {} messages...", messages.size());
         }
+        long start = System.currentTimeMillis();
         // 定序后的事件消息:
         List<AbstractEvent> sequenced = null;
         try {

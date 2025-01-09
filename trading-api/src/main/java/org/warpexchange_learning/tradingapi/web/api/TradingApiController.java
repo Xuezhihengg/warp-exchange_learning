@@ -12,15 +12,18 @@ import org.warpexchange_learning.common.ApiErrorResponse;
 import org.warpexchange_learning.common.ApiException;
 import org.warpexchange_learning.common.bean.OrderBookBean;
 import org.warpexchange_learning.common.bean.OrderRequestBean;
+import org.warpexchange_learning.common.bean.SimpleMatchDetailRecord;
 import org.warpexchange_learning.common.ctx.UserContext;
 import org.warpexchange_learning.common.message.ApiResultMessage;
 import org.warpexchange_learning.common.message.event.OrderCancelEvent;
 import org.warpexchange_learning.common.message.event.OrderRequestEvent;
+import org.warpexchange_learning.common.model.trade.OrderEntity;
 import org.warpexchange_learning.common.redis.RedisCache;
 import org.warpexchange_learning.common.redis.RedisService;
 import org.warpexchange_learning.common.support.AbstractApiController;
 import org.warpexchange_learning.common.util.IdUtil;
 import org.warpexchange_learning.common.util.JsonUtil;
+import org.warpexchange_learning.tradingapi.service.HistoryService;
 import org.warpexchange_learning.tradingapi.service.SendEventService;
 import org.warpexchange_learning.tradingapi.service.TradingEngineApiProxyService;
 
@@ -34,6 +37,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @RestController
 @RequestMapping("/api")
 public class TradingApiController extends AbstractApiController {
+
+    @Autowired
+    private HistoryService historyService;
 
     /**
      * redisService在TradingApiController中的作用主要是redis读
@@ -156,6 +162,30 @@ public class TradingApiController extends AbstractApiController {
         return sj.toString();
     }
 
+    @GetMapping("/history/orders")
+    public List<OrderEntity> getHistoryOrders(
+            @RequestParam(value = "maxResults", defaultValue = "100") int maxResults) {
+        if (maxResults < 1 || maxResults > 1000) {
+            throw new ApiException(ApiError.PARAMETER_INVALID, "maxResults", "Invalid parameter.");
+        }
+        return historyService.getHistoryOrders(UserContext.getRequiredUserId(), maxResults);
+    }
+
+    @GetMapping("/history/orders/{orderId}/matches")
+    public List<SimpleMatchDetailRecord> getOrderMatchDetails(@PathVariable("orderId") Long orderId) throws Exception {
+        final Long userId = UserContext.getRequiredUserId();
+        // 查找活动Order:
+        String strOpenOrder = tradingEngineApiProxyService.get("/internal/" + userId + "/orders/" + orderId);
+        if (strOpenOrder.equals("null")) {
+            // 查找历史Order:
+            OrderEntity orderEntity = this.historyService.getHistoryOrder(userId, orderId);
+            if (orderEntity == null) {
+                // Order未找到:
+                throw new ApiException(ApiError.ORDER_NOT_FOUND, orderId.toString(), "Order not found.");
+            }
+        }
+        return this.historyService.getHistoryMatchDetails(orderId);
+    }
 
 
     /*
@@ -263,6 +293,4 @@ public class TradingApiController extends AbstractApiController {
             logger.error("Invalid ApiResultMessage: {}", msg, e);
         }
     }
-
-
 }

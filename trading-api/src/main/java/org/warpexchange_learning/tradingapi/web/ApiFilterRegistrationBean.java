@@ -71,6 +71,7 @@ public class ApiFilterRegistrationBean extends FilterRegistrationBean<Filter> {
                 chain.doFilter(request, response);
             } else {
                 // 用户已登陆，通过UserContext传递用户ID
+                // UserContext中的登陆信息是线程隔离的，这里的userId只用于API模块
                 try (UserContext ctx = new UserContext(userId)) {
                     chain.doFilter(request, response);
                 }
